@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, Suspense, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/app/lib/supabaseClient";
 
-export default function AuthPage() {
+function AuthPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -178,5 +178,21 @@ export default function AuthPage() {
         </form>
       </div>
     </main>
+  );
+}
+
+export default function AuthPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-slate-950 flex items-center justify-center">
+          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-lg text-center text-sm text-slate-300">
+            Loading...
+          </div>
+        </main>
+      }
+    >
+      <AuthPageInner />
+    </Suspense>
   );
 }
