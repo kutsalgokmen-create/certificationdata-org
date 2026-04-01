@@ -47,13 +47,12 @@ export function certificateHtml(data: {
       display:flex;
       justify-content:space-between;
       align-items:center;
-      
+    }
     .logo { font-weight: 700; font-size: 18px; }
     .subtitle { font-size: 12px; color:#444; }
     .brand { display:flex; align-items:center; gap:10px; }
     .brandLogo { height: 60px; width: auto; display:block; max-height: none; } /* ~%30 bigger */
     .logoText { font-weight: 700; font-size: 18px; }
-    }
 
 
  

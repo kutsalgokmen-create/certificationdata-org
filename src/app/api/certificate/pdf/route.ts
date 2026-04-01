@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import puppeteer from "puppeteer";
+import puppeteer from "puppeteer-core";
+import chromium from "@sparticuz/chromium";
 import * as QRCode from "qrcode";
 import { createClient } from "@supabase/supabase-js";
 import { certificateHtml } from "./template";
@@ -128,8 +129,13 @@ try {
 
   });
 
-  // 7) Puppeteer ile PDF
-  const browser = await puppeteer.launch({ headless: true });
+  // 7) Puppeteer + serverless Chromium (Vercel / AWS Lambda)
+  const browser = await puppeteer.launch({
+    args: chromium.args,
+    defaultViewport: chromium.defaultViewport,
+    executablePath: await chromium.executablePath(),
+    headless: chromium.headless,
+  });
 
   try {
     const page = await browser.newPage();
