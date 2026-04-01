@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/app/lib/supabaseClient";
 import {
@@ -8,7 +8,7 @@ import {
   type PayPerCertTier,
 } from "@/app/config/payPerCertificate";
 
-export default function PayPerCertificateCheckoutPage() {
+function CheckoutInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -142,59 +142,6 @@ export default function PayPerCertificateCheckoutPage() {
     <main className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center">
       <div className="w-full max-w-md px-4 py-6 border border-slate-800 rounded-xl bg-slate-900/80">
         <h1 className="text-xl font-semibold mb-2">Pay Per Certificate</h1>
-        <p className="text-sm text-slate-300 mb-4">
-          One-time certificate purchase. No subscription, no recurring billing.
-        </p>
-
-        <div className="border border-slate-800 rounded-lg p-3 mb-4 text-[13px]">
-          <p className="text-slate-100 font-medium mb-1">Selected tier</p>
-          <p className="text-slate-200">
-            {tier.label} —{" "}
-            <span className="font-semibold">${tier.priceUsd.toFixed(2)}</span>
-          </p>
-          <p className="text-[11px] text-slate-500 mt-2">
-            This credit allows you to create{" "}
-            <span className="font-medium">1 certificate</span> for a file up to{" "}
-            <span className="font-medium">{tier.label}</span>. It&apos;s a
-            single-use credit and does not renew automatically.
-          </p>
-        </div>
-
-        <div className="border border-slate-800 rounded-lg p-3 mb-4 text-[12px]">
-          <p className="text-slate-100 font-medium mb-1">Summary</p>
-          <ul className="list-disc list-inside text-slate-300 space-y-1">
-            <li>1 certificate for 1 digital file</li>
-            <li>Maximum file size: {tier.label}</li>
-            <li>Instant PDF certificate + QR verification</li>
-            <li>No subscription, one-time payment only</li>
-          </ul>
-          {userEmail && (
-            <p className="text-[11px] text-slate-500 mt-2">
-              This credit will be attached to your account:{" "}
-              <span className="text-slate-300">{userEmail}</span>
-            </p>
-          )}
-        </div>
-
-        {error && (
-          <p className="text-xs text-red-400 bg-red-950/40 border border-red-900 rounded-md px-2 py-1 mb-3">
-            {error}
-          </p>
-        )}
-
-        <div className="mt-4 border border-slate-800 rounded-lg p-3 text-[12px] bg-slate-900/60">
-          <p className="text-slate-100 font-medium mb-1">
-            Secure certification summary
-          </p>
-
-          <ul className="list-disc list-inside text-slate-300 space-y-1">
-            <li>One-time payment — no subscription, no renewal</li>
-            <li>Instant PDF certificate download</li>
-            <li>QR verification included (512×512 PNG)</li>
-            <li>Permanent verification link</li>
-            <li>Your files stay private — only verification data is public</li>
-          </ul>
-        </div>
 
         <button
           type="button"
@@ -203,14 +150,18 @@ export default function PayPerCertificateCheckoutPage() {
           className="w-full inline-flex items-center justify-center px-4 py-2 rounded-md bg-emerald-500 text-slate-950 text-sm font-medium hover:bg-emerald-400 disabled:opacity-60 disabled:cursor-not-allowed transition mt-4"
         >
           {submitting
-            ? "Redirecting to secure payment..."
-            : `Continue to secure payment — $${tier.priceUsd.toFixed(2)}`}
+            ? "Redirecting..."
+            : `Continue — $${tier.priceUsd.toFixed(2)}`}
         </button>
-
-        <p className="text-[11px] text-slate-500 mt-3">
-          You will be redirected to Stripe Checkout to complete this one-time payment securely.
-        </p>
       </div>
     </main>
+  );
+}
+
+export default function PayPerCertificateCheckoutPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <CheckoutInner />
+    </Suspense>
   );
 }
