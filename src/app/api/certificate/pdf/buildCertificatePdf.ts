@@ -48,8 +48,12 @@ function fitImage(
   maxW: number,
   maxH: number
 ): { w: number; h: number } {
-  if (!imgW || !imgH) return { w: maxW, h: maxH };
+  if (!imgW || !imgH) {
+    return { w: maxW, h: maxH };
+  }
+
   const scale = Math.min(maxW / imgW, maxH / imgH);
+
   return {
     w: imgW * scale,
     h: imgH * scale,
@@ -126,12 +130,14 @@ function drawDescriptionBlock(
   }
 
   let dy = y;
+
   descLines.forEach((line: string) => {
     doc.text(line, valueX, dy);
     dy += 4.25;
   });
 
   const lineY = dy - 4.25 + 2.6;
+
   doc.setDrawColor(210, 210, 210);
   doc.setLineWidth(0.18);
   doc.line(labelX, lineY, underlineEndX, lineY);
@@ -173,6 +179,7 @@ function drawQrPanel(
 
   const urlLines: string[] = wrapText(doc, verifyUrl, size + 2);
   let uy = y + size + 10.4;
+
   urlLines.slice(0, 4).forEach((ul: string) => {
     doc.text(ul, x + size / 2, uy, { align: "center" });
     uy += 2.8;
@@ -180,25 +187,29 @@ function drawQrPanel(
 }
 
 function drawStamp(doc: jsPDF, centerX: number, centerY: number) {
+  const angle = -10;
+
   doc.setDrawColor(...STAMP);
   doc.setTextColor(...STAMP);
   doc.setLineWidth(0.45);
 
+  // jsPDF ellipse rotate etmiyor; bu yüzden yazıyı eğimli tutup
+  // çerçeveyi daha zarif ölçülerle kullanıyoruz.
   doc.ellipse(centerX, centerY, 28, 15, "S");
   doc.ellipse(centerX, centerY, 24.5, 11.8, "S");
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10.5);
-  doc.text("CertificationData", centerX, centerY - 0.8, {
+  doc.text("CertificationData", centerX, centerY - 1, {
     align: "center",
-    angle: -10,
+    angle,
   });
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.2);
-  doc.text("Verified Digital Record", centerX, centerY + 4.6, {
+  doc.text("Verified Digital Record", centerX, centerY + 5, {
     align: "center",
-    angle: -10,
+    angle,
   });
 
   doc.setTextColor(...TEXT);
@@ -222,7 +233,7 @@ export function buildCertificatePdf(data: CertificatePdfInput): Uint8Array {
   const qrSize = 34;
   const tableLineEndX = 134;
 
-  // outer frames
+  // Outer frames
   doc.setDrawColor(...GOLD);
   doc.setLineWidth(0.45);
   doc.rect(9, 9, pageW - 18, pageH - 18);
@@ -232,48 +243,48 @@ export function buildCertificatePdf(data: CertificatePdfInput): Uint8Array {
 
   let y = m;
 
-  // header logo
+  // Logo: yaklaşık %30 büyütüldü ve kenarlardan biraz uzaklaştırıldı
   if (data.logoBase64) {
     const props = doc.getImageProperties(data.logoBase64);
-    const fitted = fitImage(props.width, props.height, 18, 9);
-    safeAddImage(doc, data.logoBase64, "PNG", m, y - 1.2, fitted.w, fitted.h);
+    const fitted = fitImage(props.width, props.height, 23.4, 11.7);
+    safeAddImage(doc, data.logoBase64, "PNG", m + 1.5, y - 0.2, fitted.w, fitted.h);
   } else {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
     doc.setTextColor(...DARK);
-    doc.text("CertificationData", m, y + 3.5);
+    doc.text("CertificationData", m + 1.5, y + 4.2);
   }
 
-  // header right text
+  // Header right
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.3);
   doc.setTextColor(...MUTED);
-  doc.text("Digital Creation Certification", pageW - m, y + 1.8, {
+  doc.text("Digital Creation Certification", pageW - m, y + 2.3, {
     align: "right",
   });
-  doc.text("www.CertificationData.org", pageW - m, y + 6.2, {
+  doc.text("www.CertificationData.org", pageW - m, y + 6.7, {
     align: "right",
   });
 
-  y = 30.5;
+  // Main title + content biraz aşağı kaydırıldı
+  y = 33.5;
 
-  // title
   doc.setFont("times", "bold");
   doc.setFontSize(18.5);
   doc.setTextColor(...DARK);
   doc.text("DIGITAL ASSET CERTIFICATE", pageW / 2, y, { align: "center" });
 
-  y += 6.5;
+  y += 6.8;
 
-  // gold separator line
   doc.setDrawColor(...GOLD);
   doc.setLineWidth(0.32);
   doc.line(74, y, pageW - 74, y);
 
-  y += 8.5;
+  y += 8.7;
 
-  // certificate band
+  // Certificate badge
   const bandText = `CERTIFICATE CODE   ${data.certificateCode}`;
+
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8.4);
 
@@ -284,12 +295,13 @@ export function buildCertificatePdf(data: CertificatePdfInput): Uint8Array {
   doc.setFillColor(...LIGHT_BG);
   doc.setDrawColor(...GOLD);
   doc.roundedRect(bandX, y - 4.5, bandW, 9, 2, 2, "FD");
+
   doc.setTextColor(...TEXT);
   doc.text(bandText, pageW / 2, y + 0.5, { align: "center" });
 
-  y += 12;
+  y += 12.5;
 
-  // lead
+  // Lead
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.8);
   doc.setTextColor(70, 70, 70);
@@ -303,7 +315,7 @@ export function buildCertificatePdf(data: CertificatePdfInput): Uint8Array {
     y += 4.1;
   });
 
-  y += 5;
+  y += 5.2;
 
   const fieldsStartY = y;
   let fieldY = fieldsStartY;
@@ -406,8 +418,9 @@ export function buildCertificatePdf(data: CertificatePdfInput): Uint8Array {
 
   drawStamp(doc, pageW / 2, pageH * 0.675);
 
-  // footer
+  // Footer
   const footTop = pageH - 33;
+
   doc.setDrawColor(150, 150, 150);
   doc.setLineWidth(0.2);
   doc.line(m, footTop, pageW - m, footTop);
@@ -422,6 +435,7 @@ export function buildCertificatePdf(data: CertificatePdfInput): Uint8Array {
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(5.8);
+
   const footLines: string[] = wrapText(doc, disclaimer, pageW - 2 * m);
   let fy = footTop + 8.2;
 
