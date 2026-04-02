@@ -17,9 +17,9 @@ export type CertificatePdfInput = {
 const GOLD: [number, number, number] = [212, 175, 55];
 const DARK: [number, number, number] = [22, 22, 22];
 const TEXT: [number, number, number] = [34, 34, 34];
-const MUTED: [number, number, number] = [68, 68, 68];
+const MUTED: [number, number, number] = [88, 88, 88];
 const LIGHT_BG: [number, number, number] = [255, 248, 230];
-const STAMP: [number, number, number] = [198, 0, 0];
+const STAMP: [number, number, number] = [205, 138, 138]; // gül kurusu
 
 function safeAddImage(
   doc: jsPDF,
@@ -42,6 +42,20 @@ function wrapText(doc: jsPDF, value: string, width: number): string[] {
   return doc.splitTextToSize(value?.trim() ? value : "—", width) as string[];
 }
 
+function fitImage(
+  imgW: number,
+  imgH: number,
+  maxW: number,
+  maxH: number
+): { w: number; h: number } {
+  if (!imgW || !imgH) return { w: maxW, h: maxH };
+  const scale = Math.min(maxW / imgW, maxH / imgH);
+  return {
+    w: imgW * scale,
+    h: imgH * scale,
+  };
+}
+
 function drawFieldRow(
   doc: jsPDF,
   y: number,
@@ -50,9 +64,10 @@ function drawFieldRow(
   labelX: number,
   valueX: number,
   valueWidthMm: number,
+  underlineEndX: number,
   mono = false
 ): number {
-  const lineH = mono ? 3.9 : 4.25;
+  const lineH = mono ? 3.9 : 4.35;
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
@@ -60,7 +75,7 @@ function drawFieldRow(
   doc.text(label, labelX, y);
 
   doc.setFont(mono ? "courier" : "helvetica", "normal");
-  doc.setFontSize(mono ? 7.4 : 9);
+  doc.setFontSize(mono ? 7.3 : 9);
   doc.setTextColor(...TEXT);
 
   const lines: string[] = wrapText(doc, value, valueWidthMm);
@@ -72,13 +87,13 @@ function drawFieldRow(
   });
 
   const lastBaseline = vy - lineH;
-  const lineY = lastBaseline + 2.3;
+  const lineY = lastBaseline + 2.6;
 
-  doc.setDrawColor(0, 0, 0);
-  doc.setLineWidth(0.1);
-  doc.line(labelX, lineY, valueX + valueWidthMm, lineY);
+  doc.setDrawColor(210, 210, 210);
+  doc.setLineWidth(0.18);
+  doc.line(labelX, lineY, underlineEndX, lineY);
 
-  return lineY + 3.4;
+  return lineY + 4.2;
 }
 
 function drawDescriptionBlock(
@@ -87,6 +102,7 @@ function drawDescriptionBlock(
   labelX: number,
   valueX: number,
   valueWidthMm: number,
+  underlineEndX: number,
   description: string
 ): number {
   doc.setFont("helvetica", "bold");
@@ -112,14 +128,15 @@ function drawDescriptionBlock(
   let dy = y;
   descLines.forEach((line: string) => {
     doc.text(line, valueX, dy);
-    dy += 4.2;
+    dy += 4.25;
   });
 
-  const lineY = dy - 4.2 + 2.3;
-  doc.setLineWidth(0.1);
-  doc.line(labelX, lineY, valueX + valueWidthMm, lineY);
+  const lineY = dy - 4.25 + 2.6;
+  doc.setDrawColor(210, 210, 210);
+  doc.setLineWidth(0.18);
+  doc.line(labelX, lineY, underlineEndX, lineY);
 
-  return lineY + 3.4;
+  return lineY + 4.2;
 }
 
 function drawQrPanel(
@@ -130,52 +147,56 @@ function drawQrPanel(
   qrBase64: string,
   verifyUrl: string
 ) {
-  // outer frame
-  doc.setDrawColor(0, 0, 0);
-  doc.setLineWidth(0.18);
-  doc.roundedRect(x - 4, y - 4, size + 8, size + 28, 2.2, 2.2, "S");
+  const outerX = x - 4.5;
+  const outerY = y - 4.5;
+  const outerW = size + 9;
+  const outerH = size + 28;
 
-  // inner thin frame
-  doc.setLineWidth(0.1);
+  doc.setDrawColor(150, 150, 150);
+  doc.setLineWidth(0.22);
+  doc.roundedRect(outerX, outerY, outerW, outerH, 2.2, 2.2, "S");
+
+  doc.setDrawColor(205, 205, 205);
+  doc.setLineWidth(0.12);
   doc.roundedRect(x - 1.2, y - 1.2, size + 2.4, size + 2.4, 1.2, 1.2, "S");
 
   safeAddImage(doc, qrBase64, "PNG", x, y, size, size);
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(8.4);
+  doc.setFontSize(8.2);
   doc.setTextColor(...TEXT);
   doc.text("Scan to verify", x + size / 2, y + size + 6.2, { align: "center" });
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(6.7);
-  doc.setTextColor(85, 85, 85);
+  doc.setFontSize(5.8);
+  doc.setTextColor(...MUTED);
 
-  const urlLines: string[] = wrapText(doc, verifyUrl, size + 6);
-  let uy = y + size + 10.2;
+  const urlLines: string[] = wrapText(doc, verifyUrl, size + 2);
+  let uy = y + size + 10.4;
   urlLines.slice(0, 4).forEach((ul: string) => {
     doc.text(ul, x + size / 2, uy, { align: "center" });
-    uy += 3.05;
+    uy += 2.8;
   });
 }
 
 function drawStamp(doc: jsPDF, centerX: number, centerY: number) {
-  doc.setTextColor(STAMP[0], STAMP[1], STAMP[2], 0.32);
-  doc.setDrawColor(STAMP[0], STAMP[1], STAMP[2]);
-  doc.setLineWidth(0.55);
+  doc.setDrawColor(...STAMP);
+  doc.setTextColor(...STAMP);
+  doc.setLineWidth(0.45);
 
-  doc.ellipse(centerX, centerY, 34, 18, "S");
-  doc.ellipse(centerX, centerY, 30, 14.5, "S");
+  doc.ellipse(centerX, centerY, 28, 15, "S");
+  doc.ellipse(centerX, centerY, 24.5, 11.8, "S");
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(12);
-  doc.text("CertificationData", centerX, centerY - 1.3, {
+  doc.setFontSize(10.5);
+  doc.text("CertificationData", centerX, centerY - 0.8, {
     align: "center",
     angle: -10,
   });
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.text("Verified Digital Record", centerX, centerY + 5.2, {
+  doc.setFontSize(8.2);
+  doc.text("Verified Digital Record", centerX, centerY + 4.6, {
     align: "center",
     angle: -10,
   });
@@ -196,9 +217,10 @@ export function buildCertificatePdf(data: CertificatePdfInput): Uint8Array {
   const m = 16;
   const labelX = m;
   const valueX = m + 50;
-  const valueW = 69;
-  const qrX = 147;
-  const qrSize = 36;
+  const valueW = 66;
+  const qrX = 149;
+  const qrSize = 34;
+  const tableLineEndX = 134;
 
   // outer frames
   doc.setDrawColor(...GOLD);
@@ -210,29 +232,26 @@ export function buildCertificatePdf(data: CertificatePdfInput): Uint8Array {
 
   let y = m;
 
-  // header
+  // header logo
   if (data.logoBase64) {
-    const ok = safeAddImage(doc, data.logoBase64, "PNG", m, y - 1.5, 22, 9);
-    if (!ok) {
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(14);
-      doc.setTextColor(...DARK);
-      doc.text("CertificationData", m, y + 4.5);
-    }
+    const props = doc.getImageProperties(data.logoBase64);
+    const fitted = fitImage(props.width, props.height, 18, 9);
+    safeAddImage(doc, data.logoBase64, "PNG", m, y - 1.2, fitted.w, fitted.h);
   } else {
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(14);
+    doc.setFontSize(12);
     doc.setTextColor(...DARK);
-    doc.text("CertificationData", m, y + 4.5);
+    doc.text("CertificationData", m, y + 3.5);
   }
 
+  // header right text
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.4);
+  doc.setFontSize(8.3);
   doc.setTextColor(...MUTED);
-  doc.text("Digital Creation Certification", pageW - m, y + 2.2, {
+  doc.text("Digital Creation Certification", pageW - m, y + 1.8, {
     align: "right",
   });
-  doc.text("www.CertificationData.org", pageW - m, y + 6.8, {
+  doc.text("www.CertificationData.org", pageW - m, y + 6.2, {
     align: "right",
   });
 
@@ -240,23 +259,23 @@ export function buildCertificatePdf(data: CertificatePdfInput): Uint8Array {
 
   // title
   doc.setFont("times", "bold");
-  doc.setFontSize(19);
+  doc.setFontSize(18.5);
   doc.setTextColor(...DARK);
   doc.text("DIGITAL ASSET CERTIFICATE", pageW / 2, y, { align: "center" });
 
-  y += 6.7;
+  y += 6.5;
 
-  // real gold line, not text characters
+  // gold separator line
   doc.setDrawColor(...GOLD);
-  doc.setLineWidth(0.35);
-  doc.line(58, y, pageW - 58, y);
+  doc.setLineWidth(0.32);
+  doc.line(74, y, pageW - 74, y);
 
-  y += 8;
+  y += 8.5;
 
   // certificate band
   const bandText = `CERTIFICATE CODE   ${data.certificateCode}`;
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(8.5);
+  doc.setFontSize(8.4);
 
   const tw = doc.getTextWidth(bandText);
   const bandW = Math.min(pageW - 2 * m, tw + 16);
@@ -272,8 +291,8 @@ export function buildCertificatePdf(data: CertificatePdfInput): Uint8Array {
 
   // lead
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.setTextColor(51, 51, 51);
+  doc.setFontSize(8.8);
+  doc.setTextColor(70, 70, 70);
 
   const lead =
     "This document certifies the existence and ownership of the digital asset described below.";
@@ -281,10 +300,10 @@ export function buildCertificatePdf(data: CertificatePdfInput): Uint8Array {
 
   leadLines.forEach((ln: string) => {
     doc.text(ln, pageW / 2, y, { align: "center" });
-    y += 4.2;
+    y += 4.1;
   });
 
-  y += 4.8;
+  y += 5;
 
   const fieldsStartY = y;
   let fieldY = fieldsStartY;
@@ -297,6 +316,7 @@ export function buildCertificatePdf(data: CertificatePdfInput): Uint8Array {
     labelX,
     valueX,
     valueW,
+    tableLineEndX,
     false
   );
 
@@ -308,6 +328,7 @@ export function buildCertificatePdf(data: CertificatePdfInput): Uint8Array {
     labelX,
     valueX,
     valueW,
+    tableLineEndX,
     false
   );
 
@@ -319,6 +340,7 @@ export function buildCertificatePdf(data: CertificatePdfInput): Uint8Array {
     labelX,
     valueX,
     valueW,
+    tableLineEndX,
     false
   );
 
@@ -328,6 +350,7 @@ export function buildCertificatePdf(data: CertificatePdfInput): Uint8Array {
     labelX,
     valueX,
     valueW,
+    tableLineEndX,
     data.description
   );
 
@@ -339,6 +362,7 @@ export function buildCertificatePdf(data: CertificatePdfInput): Uint8Array {
     labelX,
     valueX,
     valueW,
+    tableLineEndX,
     false
   );
 
@@ -350,6 +374,7 @@ export function buildCertificatePdf(data: CertificatePdfInput): Uint8Array {
     labelX,
     valueX,
     valueW,
+    tableLineEndX,
     false
   );
 
@@ -361,6 +386,7 @@ export function buildCertificatePdf(data: CertificatePdfInput): Uint8Array {
     labelX,
     valueX,
     valueW,
+    tableLineEndX,
     false
   );
 
@@ -372,37 +398,36 @@ export function buildCertificatePdf(data: CertificatePdfInput): Uint8Array {
     labelX,
     valueX,
     valueW,
+    tableLineEndX,
     true
   );
 
-  drawQrPanel(doc, qrX, fieldsStartY + 1.5, qrSize, data.qrBase64, data.verifyUrl);
+  drawQrPanel(doc, qrX, fieldsStartY + 2, qrSize, data.qrBase64, data.verifyUrl);
 
-  drawStamp(doc, pageW / 2, pageH * 0.665);
+  drawStamp(doc, pageW / 2, pageH * 0.675);
 
   // footer
   const footTop = pageH - 33;
-  doc.setDrawColor(0, 0, 0);
+  doc.setDrawColor(150, 150, 150);
   doc.setLineWidth(0.2);
   doc.line(m, footTop, pageW - m, footTop);
 
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(8);
-  doc.setTextColor(85, 85, 85);
-  doc.text("CertificationData.org", m, footTop + 5);
-
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(7.2);
+  doc.setFontSize(6.2);
   doc.setTextColor(...MUTED);
+  doc.text("CertificationData.org", m, footTop + 4.5);
 
   const disclaimer =
     "This certificate records your digital asset on CertificationData with a cryptographic fingerprint and timestamp, providing verifiable proof of existence and ownership. Our certificates are designed to provide a verifiable technical record (fingerprint + timestamp). It does not replace official copyright or patent registration or local intellectual property law or official registration.";
 
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(5.8);
   const footLines: string[] = wrapText(doc, disclaimer, pageW - 2 * m);
-  let fy = footTop + 9;
+  let fy = footTop + 8.2;
 
   footLines.slice(0, 6).forEach((fl: string) => {
     doc.text(fl, m, fy);
-    fy += 3.3;
+    fy += 2.9;
   });
 
   const buf = doc.output("arraybuffer");
