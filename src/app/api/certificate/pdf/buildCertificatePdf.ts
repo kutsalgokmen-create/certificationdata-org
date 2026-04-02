@@ -187,14 +187,10 @@ function drawQrPanel(
 }
 
 function drawStamp(doc: jsPDF, centerX: number, centerY: number) {
-  const angle = -10;
-
   doc.setDrawColor(...STAMP);
   doc.setTextColor(...STAMP);
   doc.setLineWidth(0.45);
 
-  // jsPDF ellipse rotate etmiyor; bu yüzden yazıyı eğimli tutup
-  // çerçeveyi daha zarif ölçülerle kullanıyoruz.
   doc.ellipse(centerX, centerY, 28, 15, "S");
   doc.ellipse(centerX, centerY, 24.5, 11.8, "S");
 
@@ -202,14 +198,12 @@ function drawStamp(doc: jsPDF, centerX: number, centerY: number) {
   doc.setFontSize(10.5);
   doc.text("CertificationData", centerX, centerY - 1, {
     align: "center",
-    angle,
   });
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.2);
   doc.text("Verified Digital Record", centerX, centerY + 5, {
     align: "center",
-    angle,
   });
 
   doc.setTextColor(...TEXT);
@@ -243,31 +237,31 @@ export function buildCertificatePdf(data: CertificatePdfInput): Uint8Array {
 
   let y = m;
 
-  // Logo: yaklaşık %30 büyütüldü ve kenarlardan biraz uzaklaştırıldı
+  // Logo: %20 daha büyük + kenarlardan biraz daha uzak
   if (data.logoBase64) {
     const props = doc.getImageProperties(data.logoBase64);
-    const fitted = fitImage(props.width, props.height, 23.4, 11.7);
-    safeAddImage(doc, data.logoBase64, "PNG", m + 1.5, y - 0.2, fitted.w, fitted.h);
+    const fitted = fitImage(props.width, props.height, 28.1, 14.0);
+    safeAddImage(doc, data.logoBase64, "PNG", m + 2.8, y + 0.8, fitted.w, fitted.h);
   } else {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
     doc.setTextColor(...DARK);
-    doc.text("CertificationData", m + 1.5, y + 4.2);
+    doc.text("CertificationData", m + 2.8, y + 5.2);
   }
 
   // Header right
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.3);
   doc.setTextColor(...MUTED);
-  doc.text("Digital Creation Certification", pageW - m, y + 2.3, {
+  doc.text("Digital Creation Certification", pageW - m, y + 3.2, {
     align: "right",
   });
-  doc.text("www.CertificationData.org", pageW - m, y + 6.7, {
+  doc.text("www.CertificationData.org", pageW - m, y + 7.6, {
     align: "right",
   });
 
-  // Main title + content biraz aşağı kaydırıldı
-  y = 33.5;
+  // Main title + content biraz daha aşağı kaydırıldı
+  y = 36.5;
 
   doc.setFont("times", "bold");
   doc.setFontSize(18.5);
