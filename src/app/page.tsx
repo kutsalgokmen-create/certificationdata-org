@@ -18,7 +18,7 @@ export default function HomePage() {
               <img
                 src="/logo.png"
                 alt="CertificationData logo"
-                className="w-full h-full object-contain scale-110"
+                className="w-full h-full object-contain p-1"
               />
             </div>
             <div className="text-left">
