@@ -14,11 +14,11 @@ export default function HomePage() {
         <div className="relative max-w-5xl mx-auto px-4 pt-16 pb-20 flex flex-col items-center text-center">
           {/* Logo */}
           <div className="mb-4 flex items-center justify-center gap-3">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-900/80 border border-emerald-500/60 shadow-lg shadow-emerald-500/20">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl overflow-hidden bg-slate-900/80 border border-emerald-500/60 shadow-lg shadow-emerald-500/20">
               <img
                 src="/logo.png"
                 alt="CertificationData logo"
-                className="w-full h-full object-contain p-2"
+                className="w-full h-full object-contain scale-110"
               />
             </div>
             <div className="text-left">
