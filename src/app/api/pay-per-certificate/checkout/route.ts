@@ -2,11 +2,11 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getPayPerCertTier } from "@/app/config/payPerCertificate";
+import { resolvePublicSiteOrigin } from "@/lib/siteUrl";
 import { stripe } from "@/lib/stripe";
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const siteUrl = process.env.SITE_URL;
 
 if (!supabaseUrl) {
   throw new Error("Missing SUPABASE_URL");
@@ -14,10 +14,6 @@ if (!supabaseUrl) {
 
 if (!supabaseAnonKey) {
   throw new Error("Missing NEXT_PUBLIC_SUPABASE_ANON_KEY");
-}
-
-if (!siteUrl) {
-  throw new Error("Missing SITE_URL");
 }
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
@@ -64,10 +60,15 @@ export async function POST(request: Request) {
       );
     }
 
+    const origin = resolvePublicSiteOrigin();
+    if (process.env.CHECKOUT_DEBUG_ORIGIN === "1") {
+      console.info("[checkout] Stripe redirect origin:", origin);
+    }
+
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
-      success_url: `${siteUrl}/checkout/pay-per-certificate/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${siteUrl}/checkout/pay-per-certificate/cancel?tier=${encodeURIComponent(
+      success_url: `${origin}/checkout/pay-per-certificate/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/checkout/pay-per-certificate/cancel?tier=${encodeURIComponent(
         tier.id
       )}&source=${encodeURIComponent(source)}`,
       customer_email: user.email ?? undefined,
