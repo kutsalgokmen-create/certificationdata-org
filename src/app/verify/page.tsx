@@ -1,8 +1,6 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
-import { supabase } from "@/app/lib/supabaseClient";
 
 type VerifyResult = {
   certificate_code: string;
@@ -12,8 +10,6 @@ type VerifyResult = {
 };
 
 export default function VerifyPage() {
-  const router = useRouter();
-
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<VerifyResult | null>(null);
@@ -24,10 +20,13 @@ export default function VerifyPage() {
 
     if (!trimmed) return null;
 
-    // Eğer tam URL ise son segmenti çek
     try {
       if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
         const url = new URL(trimmed);
+        const fromQuery = url.searchParams.get("code");
+        if (fromQuery?.trim()) {
+          return fromQuery.trim();
+        }
         const parts = url.pathname.split("/").filter(Boolean);
         const last = parts[parts.length - 1];
         return last || null;
@@ -36,7 +35,6 @@ export default function VerifyPage() {
       // URL parse edilemezse normal kod gibi davranacağız
     }
 
-    // Eğer direk kod girildiyse
     return trimmed;
   }
 
@@ -54,49 +52,49 @@ export default function VerifyPage() {
     setLoading(true);
 
     try {
-      // 1) Sertifikayı kodla bul
-      const { data: cert, error: certError } = await supabase
-        .from("certificates")
-        .select("certificate_code, created_at, asset_id")
-        .eq("certificate_code", code)
-        .single();
+      const res = await fetch(
+        `/api/verify?code=${encodeURIComponent(code)}`,
+        { method: "GET" }
+      );
 
-      if (certError || !cert) {
-        throw new Error("Certificate not found. Please check the code or URL.");
-      }
+      const body = await res.json().catch(() => ({}));
 
-      // 2) İlgili asset'i bul (title + owner_name)
-      const { data: asset, error: assetError } = await supabase
-        .from("assets")
-        .select("title, owner_name")
-        .eq("id", cert.asset_id)
-        .single();
-
-      if (assetError || !asset) {
+      if (!res.ok) {
+        if (res.status === 404) {
+          throw new Error(
+            "Certificate not found. Please check the code or URL."
+          );
+        }
+        if (res.status === 400) {
+          throw new Error(
+            typeof body.error === "string"
+              ? body.error
+              : "Please enter a certificate code or URL."
+          );
+        }
         throw new Error(
-          "The asset related to this certificate could not be found."
+          typeof body.error === "string"
+            ? body.error
+            : "Verification failed. Please try again."
         );
       }
 
       setResult({
-        certificate_code: cert.certificate_code,
-        created_at: cert.created_at,
-        asset_title: asset.title,
-        owner_name: asset.owner_name ?? null,
+        certificate_code: body.certificate_code,
+        created_at: body.created_at,
+        asset_title: body.asset_title,
+        owner_name: body.owner_name ?? null,
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
-      setError(err.message || "Verification failed. Please try again.");
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Verification failed. Please try again.";
+      setError(message);
     } finally {
       setLoading(false);
     }
-  }
-
-  function handleOpenCertificate() {
-    if (!result) return;
-    router.push(
-      `/certificates/${encodeURIComponent(result.certificate_code)}`
-    );
   }
 
   return (
@@ -124,7 +122,7 @@ export default function VerifyPage() {
               className="w-full rounded-md bg-slate-800 border border-slate-700 px-3 py-2 text-sm text-slate-100 outline-none focus:ring-2 focus:ring-emerald-500"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="CD-1765309... or https://certificationdata.org/certificates/CD-..."
+              placeholder="CD-1765309... or https://certificationdata.org/verify?code=CD-..."
             />
           </div>
 
@@ -170,8 +168,6 @@ export default function VerifyPage() {
                 {new Date(result.created_at).toLocaleString()}
               </span>
             </p>
-
-            
           </div>
         )}
       </div>

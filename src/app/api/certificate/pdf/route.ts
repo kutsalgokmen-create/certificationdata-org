@@ -3,7 +3,19 @@ import * as QRCode from "qrcode";
 import { createClient } from "@supabase/supabase-js";
 import fs from "fs";
 import path from "path";
+import { resolvePublicSiteOrigin } from "@/lib/siteUrl";
 import { buildCertificatePdf } from "./buildCertificatePdf";
+
+function getPublicOriginForPdf(): string {
+  try {
+    return resolvePublicSiteOrigin();
+  } catch {
+    return (process.env.SITE_URL || "https://certificationdata.org").replace(
+      /\/$/,
+      ""
+    );
+  }
+}
 
 export const runtime = "nodejs";
 
@@ -45,7 +57,6 @@ export async function GET(req: Request) {
 
     const supabaseUrl = process.env.SUPABASE_URL;
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    const siteUrl = process.env.SITE_URL || "https://certificationdata.org";
 
     if (!supabaseUrl || !serviceRoleKey) {
       return NextResponse.json(
@@ -107,8 +118,8 @@ export async function GET(req: Request) {
       );
     }
 
-    // Verify URL
-    const verifyUrl = `${siteUrl.replace(/\/$/, "")}/certificates/${encodeURIComponent(
+    const origin = getPublicOriginForPdf();
+    const verifyUrl = `${origin}/verify?code=${encodeURIComponent(
       cert.certificate_code
     )}`;
 

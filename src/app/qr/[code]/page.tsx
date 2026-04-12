@@ -31,7 +31,7 @@ export default function BrandedQrPage() {
 
   const baseUrl = "https://certificationdata.org";
   const verifyUrl = useMemo(
-    () => `${baseUrl}/certificates/${encodeURIComponent(code)}`,
+    () => `${baseUrl}/verify?code=${encodeURIComponent(code)}`,
     [baseUrl, code]
   );
 

@@ -29,6 +29,15 @@ export default function CertificateDetailPage() {
       setError(null);
       setLoading(true);
 
+      const { data: authData } = await supabase.auth.getUser();
+      if (!authData.user) {
+        router.push(
+          `/auth?redirect=${encodeURIComponent(`/certificates/${encodeURIComponent(code)}`)}`
+        );
+        setLoading(false);
+        return;
+      }
+
       try {
         // 1) Find certificate by code
         const { data: cert, error: certError } = await supabase
@@ -74,11 +83,11 @@ export default function CertificateDetailPage() {
     if (code) {
       load();
     }
-  }, [code]);
+  }, [code, router]);
 
   // NOTE: sabit baseUrl kullanıyoruz, hydration hatasını önlemek için
   const baseUrl = "https://certificationdata.org";
-  const verifyUrl = `${baseUrl}/certificates/${encodeURIComponent(code)}`;
+  const verifyUrl = `${baseUrl}/verify?code=${encodeURIComponent(code)}`;
 
   const qrUrlSmall = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
     verifyUrl
