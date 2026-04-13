@@ -49,7 +49,8 @@ function toUtcString(input: string | Date) {
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const code = searchParams.get("code");
+    const rawCode = searchParams.get("code");
+    const code = rawCode?.trim() ?? "";
 
     if (!code) {
       return NextResponse.json({ error: "Missing code" }, { status: 400 });
@@ -57,6 +58,7 @@ export async function GET(req: Request) {
 
     const supabaseUrl = process.env.SUPABASE_URL;
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
     if (!supabaseUrl || !serviceRoleKey) {
       return NextResponse.json(
@@ -66,6 +68,39 @@ export async function GET(req: Request) {
         },
         { status: 500 }
       );
+    }
+
+    if (!supabaseAnonKey) {
+      return NextResponse.json(
+        { error: "Missing NEXT_PUBLIC_SUPABASE_ANON_KEY" },
+        { status: 500 }
+      );
+    }
+
+    const authHeader = req.headers.get("authorization");
+    const accessToken =
+      authHeader && authHeader.startsWith("Bearer ")
+        ? authHeader.slice(7)
+        : null;
+
+    if (!accessToken) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    });
+
+    const {
+      data: { user },
+      error: userError,
+    } = await authClient.auth.getUser(accessToken);
+
+    if (userError || !user) {
+      return NextResponse.json({ error: "Invalid session" }, { status: 401 });
     }
 
     const admin = createClient(supabaseUrl, serviceRoleKey, {
@@ -92,7 +127,9 @@ export async function GET(req: Request) {
     // 2) Asset
     const { data: asset, error: assetError } = await admin
       .from("assets")
-      .select("id, title, description, fingerprint, owner_name, created_at")
+      .select(
+        "id, title, description, fingerprint, owner_name, created_at, user_id"
+      )
       .eq("id", cert.asset_id)
       .single();
 
@@ -100,6 +137,13 @@ export async function GET(req: Request) {
       return NextResponse.json(
         { error: "Asset not found for this certificate" },
         { status: 404 }
+      );
+    }
+
+    if (asset.user_id !== user.id) {
+      return NextResponse.json(
+        { error: "You do not have access to this certificate PDF." },
+        { status: 403 }
       );
     }
 

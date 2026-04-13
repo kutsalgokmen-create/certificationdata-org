@@ -102,8 +102,43 @@ export default function CertificateDetailPage() {
     window.open(`/qr/${encodeURIComponent(code)}`, "_blank", "noopener,noreferrer");
   }
 
-  function handleDownloadPdf() {
-    window.open(`/api/certificate/pdf?code=${encodeURIComponent(code)}`, "_blank");
+  async function handleDownloadPdf() {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) {
+      router.push(
+        `/auth?redirect=${encodeURIComponent(`/certificates/${encodeURIComponent(code)}`)}`
+      );
+      return;
+    }
+    try {
+      const res = await fetch(
+        `/api/certificate/pdf?code=${encodeURIComponent(code)}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!res.ok) {
+        let msg = "Could not download the PDF. Please try again.";
+        const ct = res.headers.get("Content-Type") || "";
+        if (ct.includes("application/json")) {
+          const body = await res.json().catch(() => ({}));
+          if (typeof body.error === "string") msg = body.error;
+        }
+        alert(msg);
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${code}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert("Could not download the PDF. Please try again.");
+    }
   }
 
   return (
