@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 type VerifyResult = {
   certificate_code: string;
@@ -9,34 +10,116 @@ type VerifyResult = {
   owner_name: string | null;
 };
 
-export default function VerifyPage() {
+function extractCode(raw: string): string | null {
+  const trimmed = raw.trim();
+
+  if (!trimmed) return null;
+
+  try {
+    if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+      const url = new URL(trimmed);
+      const fromQuery = url.searchParams.get("code");
+      if (fromQuery?.trim()) {
+        return fromQuery.trim();
+      }
+      const parts = url.pathname.split("/").filter(Boolean);
+      const last = parts[parts.length - 1];
+      return last || null;
+    }
+  } catch {
+    // URL parse edilemezse normal kod gibi davranacağız
+  }
+
+  return trimmed;
+}
+
+function VerifyPageInner() {
+  const searchParams = useSearchParams();
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<VerifyResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const autoVerifiedForCodeRef = useRef<string | null>(null);
 
-  function extractCode(raw: string): string | null {
-    const trimmed = raw.trim();
+  const verifyCertificate = useCallback(
+    async (code: string, options?: { signal?: AbortSignal }) => {
+      setError(null);
+      setResult(null);
+      setLoading(true);
 
-    if (!trimmed) return null;
+      try {
+        const res = await fetch(
+          `/api/verify?code=${encodeURIComponent(code)}`,
+          { method: "GET", signal: options?.signal }
+        );
 
-    try {
-      if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
-        const url = new URL(trimmed);
-        const fromQuery = url.searchParams.get("code");
-        if (fromQuery?.trim()) {
-          return fromQuery.trim();
+        const body = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          if (res.status === 404) {
+            throw new Error(
+              "Certificate not found. Please check the code or URL."
+            );
+          }
+          if (res.status === 400) {
+            throw new Error(
+              typeof body.error === "string"
+                ? body.error
+                : "Please enter a certificate code or URL."
+            );
+          }
+          throw new Error(
+            typeof body.error === "string"
+              ? body.error
+              : "Verification failed. Please try again."
+          );
         }
-        const parts = url.pathname.split("/").filter(Boolean);
-        const last = parts[parts.length - 1];
-        return last || null;
+
+        setResult({
+          certificate_code: body.certificate_code,
+          created_at: body.created_at,
+          asset_title: body.asset_title,
+          owner_name: body.owner_name ?? null,
+        });
+      } catch (err: unknown) {
+        if (err instanceof DOMException && err.name === "AbortError") {
+          return;
+        }
+        console.error(err);
+        const message =
+          err instanceof Error
+            ? err.message
+            : "Verification failed. Please try again.";
+        setError(message);
+      } finally {
+        if (!options?.signal?.aborted) {
+          setLoading(false);
+        }
       }
-    } catch {
-      // URL parse edilemezse normal kod gibi davranacağız
+    },
+    []
+  );
+
+  const codeFromQuery =
+    extractCode(searchParams.get("code") ?? "") ?? "";
+
+  useEffect(() => {
+    if (!codeFromQuery) {
+      autoVerifiedForCodeRef.current = null;
+      return;
     }
 
-    return trimmed;
-  }
+    setInput(codeFromQuery);
+
+    if (autoVerifiedForCodeRef.current === codeFromQuery) {
+      return;
+    }
+    autoVerifiedForCodeRef.current = codeFromQuery;
+
+    const ac = new AbortController();
+    void verifyCertificate(codeFromQuery, { signal: ac.signal });
+    return () => ac.abort();
+  }, [codeFromQuery, verifyCertificate]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -49,52 +132,7 @@ export default function VerifyPage() {
       return;
     }
 
-    setLoading(true);
-
-    try {
-      const res = await fetch(
-        `/api/verify?code=${encodeURIComponent(code)}`,
-        { method: "GET" }
-      );
-
-      const body = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        if (res.status === 404) {
-          throw new Error(
-            "Certificate not found. Please check the code or URL."
-          );
-        }
-        if (res.status === 400) {
-          throw new Error(
-            typeof body.error === "string"
-              ? body.error
-              : "Please enter a certificate code or URL."
-          );
-        }
-        throw new Error(
-          typeof body.error === "string"
-            ? body.error
-            : "Verification failed. Please try again."
-        );
-      }
-
-      setResult({
-        certificate_code: body.certificate_code,
-        created_at: body.created_at,
-        asset_title: body.asset_title,
-        owner_name: body.owner_name ?? null,
-      });
-    } catch (err: unknown) {
-      console.error(err);
-      const message =
-        err instanceof Error
-          ? err.message
-          : "Verification failed. Please try again.";
-      setError(message);
-    } finally {
-      setLoading(false);
-    }
+    await verifyCertificate(code);
   }
 
   return (
@@ -157,7 +195,6 @@ export default function VerifyPage() {
                 <span className="font-medium">{result.owner_name}</span>
               </p>
             )}
-
             <p className="text-[11px] text-slate-400 mb-2">
               Certificate code:{" "}
               <span className="font-mono">{result.certificate_code}</span>
@@ -172,5 +209,21 @@ export default function VerifyPage() {
         )}
       </div>
     </main>
+  );
+}
+
+export default function VerifyPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center">
+          <div className="w-full max-w-xl px-4 py-8 text-sm text-slate-300 text-center">
+            Loading...
+          </div>
+        </main>
+      }
+    >
+      <VerifyPageInner />
+    </Suspense>
   );
 }
