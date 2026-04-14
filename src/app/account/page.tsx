@@ -26,6 +26,19 @@ function clampPct(p: number) {
   return Math.max(0, Math.min(100, Math.round(p)));
 }
 
+/** Same fallback order as `Header.tsx` (`display_name` → local-part → email → `"User"`). */
+function displayNameFromAuthUser(u: {
+  email?: string | null;
+  user_metadata?: Record<string, unknown>;
+}): string {
+  const metaName =
+    (u.user_metadata as any)?.display_name ||
+    u.email?.split("@")[0] ||
+    u.email ||
+    null;
+  return metaName || "User";
+}
+
 export default function AccountPage() {
   // Free plan defaults (later: pull from user plan)
   const FREE_MAX_CERTS = FREE_PLAN.maxCerts;
@@ -44,6 +57,10 @@ export default function AccountPage() {
   const [creditsError, setCreditsError] = useState<string | null>(null);
   const [credits, setCredits] = useState<SingleUseCredit[]>([]);
 
+  const [accountDisplayName, setAccountDisplayName] = useState("");
+  const [accountEmail, setAccountEmail] = useState("");
+  const [identityLoading, setIdentityLoading] = useState(true);
+
   const certPct = useMemo(() => {
     return certLimit > 0 ? clampPct((certUsed / certLimit) * 100) : 0;
   }, [certUsed, certLimit]);
@@ -55,7 +72,7 @@ export default function AccountPage() {
   }, [storageUsedBytes, storageLimitBytes]);
 
   useEffect(() => {
-    async function loadUsage() {
+    async function loadUsageWithUid(uid: string) {
       setUsageError(null);
       setUsageLoading(true);
 
@@ -63,14 +80,7 @@ export default function AccountPage() {
         setCertLimit(FREE_MAX_CERTS);
         setStorageLimitBytes(FREE_MAX_BYTES);
 
-        // 1) Auth
-        const { data: authData, error: authError } = await supabase.auth.getUser();
-        if (authError || !authData.user) {
-          throw new Error("You must be logged in to view your account.");
-        }
-        const uid = authData.user.id;
-
-        // 2) Count assets (each asset = certificate)
+        // 1) Count assets (each asset = certificate)
         const { data: userAssets, count, error: assetsCountError } = await supabase
           .from("assets")
           .select("id", { count: "exact" })
@@ -107,17 +117,11 @@ export default function AccountPage() {
       }
     }
 
-    async function loadCredits() {
+    async function loadCreditsWithUid(uid: string) {
       setCreditsError(null);
       setCreditsLoading(true);
 
       try {
-        const { data: authData, error: authError } = await supabase.auth.getUser();
-        if (authError || !authData.user) {
-          throw new Error("You must be logged in to view your credits.");
-        }
-        const uid = authData.user.id;
-
         const { data, error } = await supabase
           .from("single_use_credits")
           .select("id,tier_id,max_bytes,price_cents,currency,is_used,created_at,used_at,source")
@@ -134,8 +138,36 @@ export default function AccountPage() {
       }
     }
 
-    loadUsage();
-    loadCredits();
+    async function bootstrap() {
+      setIdentityLoading(true);
+      setUsageLoading(true);
+      setCreditsLoading(true);
+      setUsageError(null);
+      setCreditsError(null);
+
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+
+      if (authError || !authData.user) {
+        setAccountDisplayName("User");
+        setAccountEmail("—");
+        setUsageError("You must be logged in to view your account.");
+        setCreditsError("You must be logged in to view your credits.");
+        setIdentityLoading(false);
+        setUsageLoading(false);
+        setCreditsLoading(false);
+        return;
+      }
+
+      const u = authData.user;
+      setAccountDisplayName(displayNameFromAuthUser(u));
+      setAccountEmail(u.email ?? "—");
+      setIdentityLoading(false);
+
+      const uid = u.id;
+      await Promise.all([loadUsageWithUid(uid), loadCreditsWithUid(uid)]);
+    }
+
+    bootstrap();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -149,6 +181,18 @@ export default function AccountPage() {
             Billing & usage details for your CertificationData account.
           </p>
         </div>
+
+        {/* Signed-in identity (from Supabase Auth only) */}
+        <section className="mt-6 rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
+          <p className="text-xs text-slate-400">Display name</p>
+          <p className="mt-1 text-lg font-semibold text-white">
+            {identityLoading ? "Loading..." : accountDisplayName}
+          </p>
+          <p className="mt-4 text-xs text-slate-400">Email</p>
+          <p className="mt-1 text-lg font-semibold text-white">
+            {identityLoading ? "Loading..." : accountEmail}
+          </p>
+        </section>
 
         {/* Current plan */}
         <section className="mt-6 rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
