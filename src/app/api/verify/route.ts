@@ -46,7 +46,7 @@ export async function GET(req: Request) {
 
     const { data: asset, error: assetError } = await admin
       .from("assets")
-      .select("title, owner_name")
+      .select("title, owner_name, description")
       .eq("id", cert.asset_id)
       .single();
 
@@ -59,6 +59,7 @@ export async function GET(req: Request) {
       created_at: cert.created_at,
       asset_title: asset.title ?? "",
       owner_name: asset.owner_name ?? null,
+      description: asset.description ?? "",
     });
   } catch (err) {
     console.error("Verify API error:", err);

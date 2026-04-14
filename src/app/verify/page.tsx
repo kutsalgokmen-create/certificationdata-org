@@ -8,6 +8,7 @@ type VerifyResult = {
   created_at: string;
   asset_title: string;
   owner_name: string | null;
+  description?: string;
 };
 
 function extractCode(raw: string): string | null {
@@ -80,6 +81,7 @@ function VerifyPageInner() {
           created_at: body.created_at,
           asset_title: body.asset_title,
           owner_name: body.owner_name ?? null,
+          description: body.description,
         });
       } catch (err: unknown) {
         if (err instanceof DOMException && err.name === "AbortError") {
@@ -199,12 +201,22 @@ function VerifyPageInner() {
               Certificate code:{" "}
               <span className="font-mono">{result.certificate_code}</span>
             </p>
-            <p className="text-[11px] text-slate-400 mb-3">
+            <p className="text-[11px] text-slate-400 mb-0">
               Issued at:{" "}
               <span className="text-slate-200">
                 {new Date(result.created_at).toLocaleString()}
               </span>
             </p>
+
+            {typeof result.description === "string" &&
+              result.description.trim() !== "" && (
+                <div className="mt-3 border-t border-slate-700/50 pt-3">
+                  <p className="text-xs text-slate-400">Description</p>
+                  <p className="mt-1 text-sm text-slate-300 line-clamp-3 break-words">
+                    {result.description.trim()}
+                  </p>
+                </div>
+              )}
           </div>
         )}
       </div>
